@@ -68,9 +68,9 @@ node(MyKey, Predecessor, Successor, Next, Store, Replica) ->
         {'DOWN', Ref, process, _, _} ->
             {NewPred, NewSucc, NewNext, NewStore, NewReplica} = down(Ref, Predecessor, Successor, Next, Store, Replica),
             node(MyKey, NewPred, NewSucc, NewNext, NewStore, NewReplica);
-        {replicate, Key, Value} ->
+        {replicate, Key, Value, Qref, Client} ->
             Added = storage:add(Key, Value, Replica),
-            %%%%%
+            Client ! {Qref, ok},
             node(MyKey, Predecessor, Successor, Next, Store, Added);
         {pushreplica, NewReplica} ->
             node(MyKey, Predecessor, Successor, Next, Store, NewReplica);
@@ -144,9 +144,9 @@ add(Key, Value, Qref, Client, _, nil, {_, _, Spid}, Store) ->
 add(Key, Value, Qref, Client, MyKey, {Pkey, _, _}, {_, _, Spid}, Store) ->
     case key:between(Key , Pkey , MyKey) of 
         true ->
-            Added = storage:add(Key, Value, Store),  
+            Added = storage:add(Key, Value, Store),
+            Spid ! {replicate, Key, Value, Qref, Client},
             Client ! {Qref, ok},
-            Spid ! {replicate, Key, Value},
             Added;
         false ->
             Spid ! {add, Key, Value, Qref, Client},
